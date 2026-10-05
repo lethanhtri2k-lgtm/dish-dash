@@ -18,6 +18,7 @@ const configOK = !setupProblem;
 let pin = "", game = null, players = [], myId = null, myName = "";
 let picks = new Set(), locked = false, localStart = 0, lastKey = "", tick = null, busy = false;
 let msg = "", channel = null, poll = null;
+let lastSecond = -1, lastPhase = "", lastRoster = 0, revealPlayed = "";
 
 try { myName = localStorage.getItem("dishdash.name") || ""; } catch(e) {}
 
@@ -50,11 +51,33 @@ function watch(){
 function onData(){
   if(!game) return render();
   const key = game.round + ":" + game.q + ":" + game.started_at;
-  if(key !== lastKey){ lastKey = key; picks = new Set(); locked = false; localStart = Date.now(); }
+  if(key !== lastKey){
+    lastKey = key; picks = new Set(); locked = false; localStart = Date.now(); lastSecond = -1;
+    if(game.phase === "question") Sound.start();
+  }
+  if(game.phase !== lastPhase){
+    lastPhase = game.phase;
+    if(game.phase === "final") Sound.fanfare();
+  }
+  if(ROLE === "host"){
+    const n = roster().length;
+    if(n > lastRoster && game.phase === "lobby") Sound.join();
+    lastRoster = n;
+  }
   game.phase === "question" ? startTick() : stopTick();
   render();
 }
-function startTick(){ if(!tick) tick = setInterval(render, 300); }
+function startTick(){ if(!tick) tick = setInterval(() => { heartbeat(); render(); }, 250); }
+function heartbeat(){
+  const left = remaining();
+  if(left === lastSecond) return;
+  lastSecond = left;
+  const answered = ROLE === "player" && meRow() && meRow().answers && meRow().answers[String(game.q)];
+  if(answered) return;
+  if(left === 0) Sound.timeUp();
+  else if(left <= 5) Sound.tick(true);
+  else if(left <= 10 || left % 5 === 0) Sound.tick(false);
+}
 function stopTick(){ if(tick){ clearInterval(tick); tick = null; } }
 function limit(){ return (game && game.seconds) || 60; }
 function remaining(){
@@ -70,6 +93,10 @@ async function patchGame(patch){
 }
 
 /* ---------------- scoring ---------------- */
+/* A wrong tick costs twice what a right one earns, and a dish can go negative,
+   so ticking everything is far worse than answering nothing. */
+const WRONG_WEIGHT = 2;
+const MIN_PER_DISH = -250;
 function scoreOf(q, chosen, secondsUsed){
   const total = q.sections.reduce((t, s) => t + s.correct.length, 0);
   let right = 0, wrong = 0;
@@ -77,9 +104,17 @@ function scoreOf(q, chosen, secondsUsed){
     const [s, o] = key.split(":").map(Number);
     if(q.sections[s] && q.sections[s].correct.includes(o)) right++; else wrong++;
   });
-  const accuracy = Math.max(0, (right - wrong) / total);
-  const speed = 1 - 0.5 * Math.min(1, Math.max(0, secondsUsed / limit()));
-  return { right, wrong, total, accuracy, secondsUsed, points: Math.round(MAX_PER_DISH * accuracy * speed) };
+  const net = right - WRONG_WEIGHT * wrong;
+  const share = net / total;
+  let points;
+  if(net > 0){
+    const speed = 1 - 0.5 * Math.min(1, Math.max(0, secondsUsed / limit()));
+    points = Math.round(MAX_PER_DISH * Math.min(1, share) * speed);
+  } else {
+    /* no speed relief on a penalty — guessing fast must not be cheaper */
+    points = Math.max(MIN_PER_DISH, Math.round(250 * share));
+  }
+  return { right, wrong, total, net, accuracy:Math.max(0, share), secondsUsed, points };
 }
 const meRow = () => players.find(p => p.id === myId) || null;
 async function lockIn(auto){
@@ -255,8 +290,9 @@ function playerView(){
   const q = QUESTIONS[game.q] || QUESTIONS[0];
   if(game.phase === "lobby"){
     return `<div class="card center"><p class="big">You're in, ${esc(me.name)}!</p>
-      <p class="note">Watch the teacher's screen. Each dish is worth up to ${MAX_PER_DISH} points —
-        wrong ticks pull your score down, and answering quickly keeps more of it.</p>
+      <p class="note">Watch the teacher's screen. Each dish is worth up to ${MAX_PER_DISH} points.
+        A wrong tick costs double a right one and a dish can go as low as ${MIN_PER_DISH},
+        so only tick what you believe. Answering quickly keeps more of what you earn.</p>
       ${board(10)}${errLine()}</div>`;
   }
   if(game.phase === "final"){
@@ -268,6 +304,10 @@ function playerView(){
   const answer = me.answers && me.answers[String(game.q)];
   if(game.phase === "reveal"){
     const pts = answer ? answer.points : 0;
+    if(revealPlayed !== lastKey){
+      revealPlayed = lastKey;
+      pts > 0 ? Sound.good(pts >= MAX_PER_DISH * 0.8) : Sound.bad();
+    }
     const detail = answer
       ? `${answer.right} of ${answer.total} right${answer.wrong ? `, ${answer.wrong} wrong` : ""} · locked in at ${answer.secondsUsed}s`
       : "You did not lock in an answer.";
@@ -276,7 +316,7 @@ function playerView(){
           <div><h2 class="qtitle">${esc(q.dish.name)}</h2>
             <div class="banner ${pts > 0 ? "good" : "bad"}">+${pts} points</div>
             <p class="note">${esc(detail)}</p>
-            <p class="note">Ticks with ✔ were right. Ticks with ✘ pulled your score down.</p></div></div>
+            <p class="note">Ticks with ✔ earned a point each. Ticks with ✘ cost two each.</p></div></div>
       </div>
       <div class="card">${allSections(q, { interactive:false, reveal:true, mine: answer ? answer.picks : [] })}</div>
       <div class="card"><h3>Scoreboard</h3>${board(10)}</div>${errLine()}`;
@@ -286,7 +326,8 @@ function playerView(){
       <div class="stage">${dishPic(q.dish)}
         <div><span class="pill">Dish ${game.q + 1} of ${QUESTIONS.length}</span>
           <h2 class="qtitle" style="margin-top:6px">${esc(q.dish.name)}</h2>
-          <p class="note">Scroll down and tick every answer you think is right, then lock in.</p>
+          <p class="note">Tick every answer you think is right, then lock in.
+            A wrong tick costs <strong>double</strong> what a right one earns, so ticking everything scores below zero.</p>
           <div class="row">${ring()}<span class="pill">${me.score || 0} points so far</span></div></div></div>
     </div>
     <div class="card">${allSections(q, { interactive: !locked && !answer, reveal:false })}</div>${errLine()}
@@ -297,6 +338,12 @@ function playerView(){
 }
 
 /* ---------------- render ---------------- */
+function soundButton(){
+  const el = $("soundbtn");
+  if(!el) return;
+  el.textContent = Sound.enabled ? "sound on" : "sound off";
+  el.setAttribute("aria-pressed", Sound.enabled);
+}
 function render(){
   if(setupProblem === "library"){
     $("app").innerHTML = `<div class="card"><p class="big">No connection</p>
@@ -315,6 +362,7 @@ function render(){
   if($("qpill")){ $("qpill").hidden = !show; if(show) $("qpill").textContent = `Dish ${game.q + 1} / ${QUESTIONS.length}`; }
   if($("pinpill")){ $("pinpill").hidden = !pin; $("pinpill").textContent = "PIN " + pin; }
   $("app").innerHTML = ROLE === "host" ? hostView() : playerView();
+  soundButton();
   wire();
 }
 function drawQR(){
@@ -331,9 +379,16 @@ function drawQR(){
 }
 function wire(){
   const on = (id, fn) => { const el = $(id); if(el) el.addEventListener("click", fn); };
+  const sb2 = $("soundbtn");
+  if(sb2 && !sb2.dataset.wired){
+    sb2.dataset.wired = "1";
+    sb2.addEventListener("click", () => { Sound.toggle(); soundButton(); });
+  }
+  document.addEventListener("click", () => Sound.unlock(), { once:true });
   $("app").querySelectorAll(".opt[data-k]").forEach(b => b.addEventListener("click", () => {
     const k = b.dataset.k;
     picks.has(k) ? picks.delete(k) : picks.add(k);
+    Sound.pick();
     render();
   }));
   $("app").querySelectorAll(".tbtn[data-t]").forEach(b => b.addEventListener("click", () => patchGame({ seconds:Number(b.dataset.t) })));
@@ -346,7 +401,7 @@ function wire(){
     : patchGame({ phase:"final" }));
   on("stop", () => patchGame({ phase:"final" }));
   on("again", () => patchGame({ phase:"lobby", round:game.round + 1, q:0 }));
-  on("lock", () => lockIn(false));
+  on("lock", () => { Sound.lock(); lockIn(false); });
   on("join", join);
   on("reload", () => location.reload());
   on("copylink", e => {
