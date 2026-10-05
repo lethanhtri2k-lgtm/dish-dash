@@ -59,6 +59,7 @@ function onData(){
     lastPhase = game.phase;
     if(game.phase === "final") Sound.fanfare();
   }
+  Music.setPhase(game.phase);
   if(ROLE === "host"){
     const n = roster().length;
     if(n > lastRoster && game.phase === "lobby") Sound.join();
@@ -382,7 +383,11 @@ function wire(){
   const sb2 = $("soundbtn");
   if(sb2 && !sb2.dataset.wired){
     sb2.dataset.wired = "1";
-    sb2.addEventListener("click", () => { Sound.toggle(); soundButton(); });
+    sb2.addEventListener("click", () => {
+      Sound.toggle();
+      soundButton();
+      Music.setPhase(game ? game.phase : "lobby");
+    });
   }
   document.addEventListener("click", () => Sound.unlock(), { once:true });
   $("app").querySelectorAll(".opt[data-k]").forEach(b => b.addEventListener("click", () => {
@@ -392,7 +397,7 @@ function wire(){
     render();
   }));
   $("app").querySelectorAll(".tbtn[data-t]").forEach(b => b.addEventListener("click", () => patchGame({ seconds:Number(b.dataset.t) })));
-  on("create", createGame);
+  on("create", () => { Sound.unlock(); Music.setPhase("lobby"); createGame(); });
   on("addtime", () => patchGame({ seconds:limit() + 15 }));
   on("start", () => patchGame({ phase:"question", q:0, started_at:new Date().toISOString() }));
   on("reveal", () => patchGame({ phase:"reveal" }));
