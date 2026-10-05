@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dish Dash</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brandmark">
+      <svg width="34" height="34" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="2" y="2" width="44" height="44" rx="13" fill="var(--tomato)"/>
+        <circle cx="24" cy="25" r="11" fill="var(--butter)"/>
+        <path d="M13 25a11 11 0 0 1 22 0z" fill="var(--basil)"/>
+      </svg>
+      <h1>Dish Dash</h1>
+    </div>
+    <span class="pill">player</span>
+    <span class="pill" id="pinpill" hidden></span>
+    <div class="spacer"></div>
+    <span class="pill" id="qpill" hidden></span>
+  </div>
+  <div id="app"><div class="card center"><p class="big">Setting the table…</p></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>if(!window.supabase){document.write('<scr'+'ipt src="https://unpkg.com/@supabase/supabase-js@2"><\/scr'+'ipt>');}</script>
+<script>window.DISH_ROLE = "player";</script>
+<script src="assets/config.js"></script>
+<script src="assets/dishes.js"></script>
+<script src="assets/game.js"></script>
+</body>
+</html>
