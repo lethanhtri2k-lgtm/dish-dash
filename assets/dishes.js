@@ -5,7 +5,7 @@ const DISHES = [
     origin:["Vietnamese"], originWrong:["Italian","Mexican","Greek"],
     ingr:["shrimp","rice paper","fresh herbs","lettuce"], ingrWrong:["cheese","beef","potatoes"],
     type:["Appetizer"], typeWrong:["Main dish","Side dish","Dessert"],
-    prep:["fresh (no cooking)","boiled"], prepWrong:["baked","grilled","pickled"] },
+    prep:["raw","boiled"], prepWrong:["baked","grilled","pickled"] },
   { name:"Beef tacos", photo:"assets/photos/tacos.jpg",
     origin:["Mexican"], originWrong:["Thai","Japanese","French"],
     ingr:["beef","tortilla","tomatoes","lettuce"], ingrWrong:["mango","rice paper","noodles"],
@@ -15,7 +15,7 @@ const DISHES = [
     origin:["Greek"], originWrong:["Korean","Indian","Vietnamese"],
     ingr:["cucumber","tomatoes","feta cheese","olives","red onion"], ingrWrong:["beef","mango","noodles"],
     type:["Side dish"], typeWrong:["Main dish","Dessert","Appetizer"],
-    prep:["fresh (no cooking)"], prepWrong:["fried","baked","boiled"] },
+    prep:["raw"], prepWrong:["fried","baked","boiled"] },
   { name:"Mango sticky rice", photo:"assets/photos/mango-sticky-rice.jpg",
     origin:["Thai"], originWrong:["Italian","Mexican","American"],
     ingr:["mango","sticky rice","coconut milk"], ingrWrong:["beef","onion","potatoes"],
@@ -25,7 +25,7 @@ const DISHES = [
     origin:["Italian"], originWrong:["Japanese","Moroccan","Korean"],
     ingr:["cheese","tomatoes","basil","dough"], ingrWrong:["shrimp","mango","kimchi"],
     type:["Main dish"], typeWrong:["Dessert","Side dish","Appetizer"],
-    prep:["baked"], prepWrong:["steamed","fresh (no cooking)","pickled"] }
+    prep:["baked"], prepWrong:["steamed","raw","pickled"] }
 ];
 
 /* Options are shuffled with a fixed seed, so every device shows them in the same order. */
